@@ -1,0 +1,30 @@
+{
+  "name": "Check Correctness",
+  "description": "Checks whether the actual output matches the expected output in material meaning.",
+  "type": "llm_as_judge",
+  "prompt": [
+    {
+      "role": "user",
+      "content": "You are an expert semantic-equivalence evaluator for AI systems.\nYou will receive an actual assistant output and an expected output.\nYour job is to decide whether the actual output preserves the expected output's material meaning.\n\n## Scope\n- Compare only semantic content.\n- Treat the expected output as the source of truth for required conclusions, facts, constraints, and relationships.\n- Ignore output shape, serialization, key order, nesting, formatting, whitespace, length, and presentation style unless a difference changes material meaning.\n\n## Golden Rule\nScore true only when the actual output conveys every material meaning, fact, constraint, and conclusion in the expected output without a material contradiction. Score false for any material semantic mismatch.\n\n## Semantic Comparison\n- Accept paraphrases, synonyms, equivalent calculations, reordered statements, and accurately reformatted structured data.\n- Accept additional detail only when it is non-conflicting and does not alter or obscure the expected meaning.\n- Treat equivalent information expressed in text, objects, arrays, or another representation as matching when the meaning is preserved.\n- Score false for a wrong conclusion, contradicted fact, missing required detail, altered constraint, unsupported claim, misleading addition, or changed relationship between facts.\n\n## Decision Rules\n1. Identify the expected output's material claims, facts, constraints, conclusions, and relationships.\n2. Compare the actual output against each semantic requirement.\n3. Ignore purely structural or formatting differences that do not change meaning.\n4. Return true only if all material semantic requirements are preserved.\n5. Return false if either value is missing, the expected meaning is unclear, or any material semantic mismatch remains.\n\n## Examples\n- Expected: \"The capital of France is Paris.\" Actual: \"Paris is the capital of France.\" → true\n- Expected: {\"answer\": \"Paris\"} Actual: \"The answer is Paris.\" → true\n- Expected: [\"refund\", \"invoice\"] Actual: \"The required items are refund and invoice.\" → true\n- Expected: {\"answer\": \"Paris\", \"country\": \"France\"} Actual: \"The answer is Paris.\" → false\n- Expected: \"Return YES or NO.\" Actual: \"The correct answer is maybe.\" → false\nTrue only when the actual output preserves every material semantic requirement in the expected output; false otherwise.\n\nActual assistant output: {{assistant_output}}\nExpected output: {{expected_output}}"
+    }
+  ],
+  "variableMapping": [
+    {
+      "variable": "assistant_output",
+      "source": "output"
+    },
+    {
+      "variable": "expected_output",
+      "source": "expected_output"
+    }
+  ],
+  "modelConfig": {
+    "provider": "openai",
+    "model": "gpt-4o"
+  },
+  "outputDefinition": {
+    "scoreReasoningInstructions": "One concise sentence.",
+    "scoreValueInstructions": "Boolean verdict.",
+    "dataType": "BOOLEAN"
+  }
+}

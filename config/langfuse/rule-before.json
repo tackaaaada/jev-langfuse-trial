@@ -1,0 +1,19 @@
+{
+  "name": "isRootObservation = true",
+  "enabled": true,
+  "sampling": 1,
+  "filter": [
+    {
+      "type": "boolean",
+      "column": "isRootObservation",
+      "operator": "=",
+      "value": true
+    }
+  ],
+  "evaluatorAssignments": [
+    {
+      "evaluatorId": "YOUR_PRIVATE_ID",
+      "variableMapping": null
+    }
+  ]
+}

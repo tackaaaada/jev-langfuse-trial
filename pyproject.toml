@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
     "langfuse>=4.15.4",
     "python-dotenv>=1.2.3",
+    "typesafe-sdk>=0.7.0",
 ]
 
 [dependency-groups]
