@@ -1,7 +1,7 @@
 # Jev + Langfuse Trial
 
 Jevで回答の意味的一致を一次判定し、その結果を参考情報としてLangfuseのマネージドEvaluator（GPT-4o）に渡し、最終判定するPythonプロジェクトです。
-現在は固定の合成データ1件で動作確認しています。検証用データセットの作成・評価精度の校正は今後行います。
+固定の長文ペアに加え、Jevあり・なしを比較する10件の合成検証データを用意しています。これは接続と判定傾向を確認するための小規模な校正用データであり、精度の一般的な評価には使いません。
 
 ## 構成と評価基準
 
@@ -67,13 +67,19 @@ langfuse --version
 uv run python -m src.jev_experiment
 ```
 
-現在の入力は以下の1件です。
+現在の入力は[data/long_semantic_match.json](data/long_semantic_match.json)の長文ペアです。
+店名・営業時間・定休日・予約条件・キャンセル期限・駐車場の情報を、意味を維持しつつ言い換えています。
 
-| 項目 | 値 |
-| --- | --- |
-| 質問（記録用） | サンプルショップの開店時刻は？ |
-| 評価対象の回答 | 午前10時に開店します。 |
-| 期待回答 | サンプルショップの開店時刻は午前10時です。 |
+同じペアを3回評価する場合:
+
+```bash
+uv run python -m src.jev_experiment --repeat 3
+```
+
+各回を別プロセスで実行し、`batch_id`・`run_index`をmetadataに記録します。
+実行ごとのトレースIDはGit管理対象外の`results/`にも保存します。
+最終判定は非同期のため、コマンド終了後にLangfuseで確認してください。
+[3回の結果と分析](docs/long-answer-three-runs.md)を参照してください。
 
 Jevと最終Evaluatorは、評価対象の回答と期待回答を基準に比較します。質問文は判定用プロンプトには渡していません。
 毎回Jevを1回呼び出し、新しいトレースを作成します。有効な評価ルールがある場合はGPT-4oも呼ばれるため、両プロバイダーのAPI利用料が発生します。
@@ -81,6 +87,33 @@ Jevのタイムアウトは30秒、自動再試行は無効です。
 
 コマンドは一次判定、トレースID、確認URL、最終評価対象Observation IDを表示します。
 最終結果は確認URLの`finalize-answer`に付いた`Check Correctness`スコアで確認します。
+
+### Jevなしの対照評価
+
+```bash
+uv run python -m src.no_jev_experiment --repeat 3
+```
+
+同じ長文ペアをGPT-4oだけで評価します。Jevの呼び出し・一次判定の受け渡しはありません。
+`Check Correctness Without Jev`と専用ルールを作成済みで、`finalize-answer-without-jev`だけを対象にします。
+意味的一致の基準は共通で、Jevの情報とそれを参照する指示を除去しています。
+設定は`config/langfuse/evaluator-without-jev.json`と`config/langfuse/rule-without-jev.json`です。
+Jevありの設定を変更せず、両条件を別々に再実行できます。
+
+今回、Jevあり・なし各3回ともtrueでした。これは同じ1ペアの反復結果です。
+[比較結果と判定理由](docs/without-jev-three-runs.md)に条件、限界、トレースURLを記載しています。
+
+### 10件の比較ベンチマーク
+
+```bash
+uv run python -m src.semantic_equivalence_benchmark --condition both
+```
+
+[data/semantic_equivalence_v0.json](data/semantic_equivalence_v0.json)の10件を、JevありとJevなしの両方で1回ずつ評価します。各ケースの`expected_match`は人手で付けた比較用の正解ラベルです。LangfuseのEvaluatorに渡す変数には含めず、Observationのmetadataにだけ保存します。
+
+Jevありでは`finalize-answer`を`Check Correctness`が、Jevなしでは`finalize-answer-without-jev`を`Check Correctness Without Jev`が評価します。前者にだけ`jev_result`を渡します。したがって同じ回答・期待回答に対する、Jev情報の有無を比較できます。
+
+2026-09-19の実行では、3系統（Jev、JevありGPT-4o、JevなしGPT-4o）は10件中9件で人手ラベルと一致し、両GPT-4o条件の最終true/falseは10件すべて同一でした。詳細、全トレース、解釈上の限界は[10件ベンチマークの結果](docs/semantic-equivalence-v0-benchmark.md)を参照してください。
 
 ### 接続確認のみ
 
@@ -173,8 +206,9 @@ langfuse --env .env api scores list --trace-id TRACE_ID --fields subject,details
 ## 開発時の検証
 
 ```bash
-uv run pytest -q tests/test_jev_experiment.py
-uv run ruff check src/jev_experiment.py tests/test_jev_experiment.py
+uv run python -m pytest -q
+uv run python -m ruff format --check src tests
+uv run python -m ruff check src tests
 ```
 
 テストは外部APIを呼ばず、Jev完了後に最終評価対象を作成すること、判定と期待回答の受け渡し、Jev失敗時に最終評価を作成しないことを確認します。

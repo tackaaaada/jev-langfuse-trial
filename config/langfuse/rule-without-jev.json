@@ -1,0 +1,21 @@
+{
+  "name": "Final review without Jev",
+  "enabled": true,
+  "sampling": 1,
+  "filter": [
+    {
+      "type": "stringOptions",
+      "column": "name",
+      "operator": "any of",
+      "value": [
+        "finalize-answer-without-jev"
+      ]
+    }
+  ],
+  "evaluatorAssignments": [
+    {
+      "evaluatorId": "YOUR_PRIVATE_ID",
+      "variableMapping": null
+    }
+  ]
+}
