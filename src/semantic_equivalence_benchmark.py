@@ -94,9 +94,9 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             version=RUBRIC_VERSION,
         ) as generation:
             response = evaluate(state)
-            jev_correctness_assessment = correctness_assessment(response)
-            probability = jev_correctness_assessment["is_correct"]["probability"]
-            passed = jev_correctness_assessment["is_correct"]["passed"]
+            assessment = correctness_assessment(response)
+            probability = assessment.probability
+            passed = assessment.passed
             generation.update(
                 model=response.model,
                 output=response.model_dump(mode="json"),
@@ -113,42 +113,17 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             metadata={
                 **metadata,
                 "expected_output": case["expected_output"],
-                "jev_correctness_assessment": jev_correctness_assessment,
+                "jev_correctness_assessment": assessment.metadata(),
             },
         ) as final_review:
-            for name, value, data_type, comment in (
-                (
-                    "jev_correctness_probability",
-                    probability,
-                    "NUMERIC",
-                    "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
-                ),
-                (
-                    "jev_is_correct",
-                    int(passed),
-                    "BOOLEAN",
-                    "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
-                ),
-                (
-                    "jev_primary_correctness_issue",
-                    jev_correctness_assessment["primary_correctness_issue"]["choice"],
-                    "CATEGORICAL",
-                    "Jev Choiceによる正確性上の主因。",
-                ),
-                (
-                    "jev_correctness_materiality",
-                    jev_correctness_assessment["correctness_materiality"]["score"],
-                    "NUMERIC",
-                    "Jev Scoreによる正確性上の差分の重要度（0〜3）。",
-                ),
-            ):
+            for score in assessment.langfuse_scores():
                 client.create_score(
                     trace_id=root.trace_id,
                     observation_id=final_review.id,
-                    name=name,
-                    value=value,
-                    data_type=data_type,
-                    comment=comment,
+                    name=score.name,
+                    value=score.value,
+                    data_type=score.data_type,
+                    comment=score.comment,
                     metadata=metadata,
                 )
         return {
@@ -160,7 +135,7 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             "trace_url": client.get_trace_url(trace_id=root.trace_id),
             "jev_probability": probability,
             "jev_passed": passed,
-            "jev_correctness_assessment": jev_correctness_assessment,
+            "jev_correctness_assessment": assessment.metadata(),
         }
 
 
