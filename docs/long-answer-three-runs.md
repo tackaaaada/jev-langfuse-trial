@@ -12,11 +12,11 @@
 
 ## 結果
 
-| 回 | Jev確率 | 一次判定 | GPT-4o最終判定 | 記録 |
-| --- | --- | --- | --- | --- |
-| 1 | 0.97 | true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| 2 | 0.97 | true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| 3 | 0.97 | true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
+| 回 | Jev確率 | 一次判定 | GPT-4o最終判定 |
+| --- | --- | --- | --- |
+| 1 | 0.97 | true | true |
+| 2 | 0.97 | true | true |
+| 3 | 0.97 | true | true |
 
 ## 分析
 
@@ -30,4 +30,4 @@
 
 最初の連続実行ではLangfuse SDKをshutdown後に同一プロセスで再利用したため、2回目のScore送信・終了処理が停止しました。1・2回目のJev結果と最終評価対象は保存済みでした。停止プロセスを終了し、2回目のJevスコア2件を保存済みmetadataから復元しました。JevとGPT-4oの再評価は行っていません。3回目は別プロセスで実行しました。今後の`--repeat 3`も各回を別プロセスで実行します。
 
-全判定理由と実モデル・Evaluator版は[結果JSON](long-answer-three-runs.json)、入力は[データファイル](../data/long_semantic_match.json)に保存しています。
+入力は[データファイル](../data/long_semantic_match.json)に保存しています。トレースURL・内部ID・生の実行記録は公開用のリポジトリから除外しています。

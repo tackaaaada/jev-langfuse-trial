@@ -1,6 +1,6 @@
 # 意味的一致ベンチマーク v0（10件）
 
-2026-09-19に、[10件の合成データ](../data/semantic_equivalence_v0.json)をJevあり・なしの両条件で各1回ずつ評価しました。ベンチマークIDは`YOUR_PRIVATE_ID`です。
+2026-09-19に、[10件の合成データ](../data/semantic_equivalence_v0.json)をJevあり・なしの両条件で各1回ずつ評価しました。実行時のベンチマークID・トレースIDは公開していません。
 
 ## 条件
 
@@ -15,18 +15,18 @@
 
 | ケース | 人手ラベル | Jev（確率 / 判定） | GPT-4o: Jevあり | GPT-4o: Jevなし |
 | --- | --- | --- | --- | --- |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.97 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.93 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.94 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.59 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | false | 0.04 / false | false | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | false | 0.02 / false | false | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | false | 0.79 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | false | 0.01 / false | false | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.86 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª | true | 0.94 / true | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
+| equivalent-shop-guide | true | 0.97 / true | true | true |
+| equivalent-reordered-policy | true | 0.93 / true | true | true |
+| equivalent-structured-answer | true | 0.94 / true | true | true |
+| equivalent-calculation | true | 0.59 / true | true | true |
+| missing-refund-exception | false | 0.04 / false | false | false |
+| contradicted-booking-deadline | false | 0.02 / false | false | false |
+| unsupported-shipping-claim | false | 0.79 / true | true | true |
+| changed-relationship | false | 0.01 / false | false | false |
+| equivalent-clarifying-addition | true | 0.86 / true | true | true |
+| boundary-proportional-rate | true | 0.94 / true | true | true |
 
-表のケース名はJevありのトレース、右端の判定はJevなしのトレースへリンクしています。
+トレースURLと内部IDは公開用の記録から除外しています。ローカル実行時は、出力される`benchmark_id`でLangfuseを検索してください。
 
 ## 読み取れること
 

@@ -31,10 +31,22 @@ def test_jev_condition_records_result_and_control_omits_it(monkeypatch):
 
     client.start_as_current_observation.side_effect = observation
     response = SimpleNamespace(
-        nouls={"semantic_match": SimpleNamespace(noul=0.8)},
+        nouls={"is_correct": SimpleNamespace(noul=0.8)},
+        choices={
+            "primary_correctness_issue": SimpleNamespace(
+                choice="no_material_issue",
+                confidence=0.8,
+                probabilities={"no_material_issue": 0.8},
+            )
+        },
+        scores={
+            "correctness_materiality": SimpleNamespace(
+                score=0.1, confidence=0.8, probabilities={0: 0.9, 1: 0.1}
+            )
+        },
         model="jev-test",
         usage=SimpleNamespace(input_tokens=10, output_tokens=1),
-        model_dump=lambda **_: {"answers": {"semantic_match": {"noul": 0.8}}},
+        model_dump=lambda **_: {"answers": {"is_correct": {"noul": 0.8}}},
     )
     monkeypatch.setattr(benchmark, "evaluate", lambda _state: response)
     case = benchmark.load_cases()[0]
@@ -49,11 +61,26 @@ def test_jev_condition_records_result_and_control_omits_it(monkeypatch):
         item for item in observations if item["name"] == "finalize-answer-without-jev"
     )
     assert with_jev["jev_probability"] == 0.8
-    assert final_with["metadata"]["jev_result"]["passed"] is True
-    assert "jev_result" not in final_without["metadata"]
+    assessment = final_with["metadata"]["jev_correctness_assessment"]
+    assert assessment["is_correct"]["passed"] is True
+    assert assessment["primary_correctness_issue"]["choice"] == "no_material_issue"
+    assert assessment["correctness_materiality"]["score"] == 0.1
+    assert "jev_correctness_assessment" not in final_without["metadata"]
     assert final_with["metadata"]["human_expected_match"] == case["expected_match"]
     assert final_without["metadata"]["human_expected_match"] == case["expected_match"]
-    assert client.create_score.call_count == 2
+    assert client.create_score.call_count == 4
+
+
+def test_jev_questions_are_all_about_correctness():
+    from src.jev_judge import QUESTIONS
+
+    assert set(QUESTIONS) == {
+        "is_correct",
+        "primary_correctness_issue",
+        "correctness_materiality",
+    }
+    assert "no_material_issue" in QUESTIONS["primary_correctness_issue"].criteria
+    assert len(QUESTIONS["correctness_materiality"].criteria) == 4
 
 
 def test_evaluators_do_not_map_human_labels_into_prompts():

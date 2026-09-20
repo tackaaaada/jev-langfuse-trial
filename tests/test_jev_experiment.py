@@ -43,7 +43,19 @@ def setup_run(monkeypatch, fail=False):
             raise RuntimeError("Jev unavailable")
         events.append("jev-complete")
         return SimpleNamespace(
-            nouls={"semantic_match": SimpleNamespace(noul=0.47)},
+            nouls={"is_correct": SimpleNamespace(noul=0.47)},
+            choices={
+                "primary_correctness_issue": SimpleNamespace(
+                    choice="missing_required_detail",
+                    confidence=0.8,
+                    probabilities={"missing_required_detail": 0.8},
+                )
+            },
+            scores={
+                "correctness_materiality": SimpleNamespace(
+                    score=2.0, confidence=0.8, probabilities={2: 0.8}
+                )
+            },
             model="jev-test",
             usage=SimpleNamespace(input_tokens=100, output_tokens=5),
             model_dump=lambda **_: {"probability": 0.47},
@@ -60,8 +72,13 @@ def test_final_review_receives_completed_judgment(monkeypatch):
     final = next(o for o in observations if o["name"] == "finalize-answer")
     assert final["output"] == final["input"]["assistant_output"]
     assert final["metadata"]["expected_output"] == final["input"]["expected_output"]
-    assert final["metadata"]["jev_result"]["probability"] == 0.47
-    assert final["metadata"]["jev_result"]["passed"] is False
+    assessment = final["metadata"]["jev_correctness_assessment"]
+    assert assessment["is_correct"]["probability"] == 0.47
+    assert assessment["is_correct"]["passed"] is False
+    assert (
+        assessment["primary_correctness_issue"]["choice"] == "missing_required_detail"
+    )
+    assert assessment["correctness_materiality"]["score"] == 2.0
     assert all(
         c.kwargs["observation_id"] == "finalize-answer"
         for c in client.create_score.call_args_list
@@ -72,7 +89,7 @@ def test_final_review_receives_completed_judgment(monkeypatch):
     assert {m["variable"]: m.get("jsonPath") for m in config["variableMapping"]} == {
         "assistant_output": None,
         "expected_output": "$.expected_output",
-        "jev_result": "$.jev_result",
+        "jev_correctness_assessment": "$.jev_correctness_assessment",
     }
 
 

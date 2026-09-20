@@ -12,11 +12,11 @@
 
 ## 結果
 
-| 回 | Jevあり（前回） | Jevなし（今回） | 今回のトレース |
-| --- | --- | --- | --- |
-| 1 | true（Jev確率0.97） | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| 2 | true（Jev確率0.97） | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
-| 3 | true（Jev確率0.97） | true | ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª |
+| 回 | Jevあり（前回） | Jevなし（今回） |
+| --- | --- | --- |
+| 1 | true（Jev確率0.97） | true |
+| 2 | true（Jev確率0.97） | true |
+| 3 | true（Jev確率0.97） | true |
 
 ## 読み取れること
 
@@ -99,4 +99,4 @@ The semantic comparison evaluates both the expected and actual outputs to determ
 ### Conclusion:
 All material elements and relationships between facts and constraints are preserved with no contradictions. The actual output provides a full match to the expected output's semantic content.
 
-全結果とIDは[JSON](without-jev-three-runs.json)、前回は[Jevありのレポート](long-answer-three-runs.md)を参照してください。
+前回は[Jevありのレポート](long-answer-three-runs.md)を参照してください。トレースURL・内部ID・生の実行記録は公開用のリポジトリから除外しています。

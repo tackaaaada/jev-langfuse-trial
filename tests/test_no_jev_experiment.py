@@ -46,7 +46,7 @@ def test_without_jev_sends_three_observations(monkeypatch, tmp_path):
         assert o["name"] == "finalize-answer-without-jev"
         assert o["output"] == case["assistant_output"]
         assert o["metadata"]["expected_output"] == case["expected_output"]
-        assert "jev_result" not in o["metadata"]
+        assert "jev_correctness_assessment" not in o["metadata"]
     forbidden.assert_not_called()
     client.create_score.assert_not_called()
     client.shutdown.assert_called_once()
@@ -59,11 +59,13 @@ def test_control_preserves_rubric_and_model():
     assert control["modelConfig"] == treatment["modelConfig"]
     assert (
         control["prompt"][0]["content"]
-        == treatment["prompt"][0]["content"].split("\n\n## Preliminary Jev assessment")[
-            0
-        ]
+        == treatment["prompt"][0]["content"].split(
+            "\n\n## Preliminary Jev correctness assessment"
+        )[0]
     )
     assert control["variableMapping"] == [
-        m for m in treatment["variableMapping"] if m["variable"] != "jev_result"
+        m
+        for m in treatment["variableMapping"]
+        if m["variable"] != "jev_correctness_assessment"
     ]
     assert "Jev" not in control["outputDefinition"]["scoreReasoningInstructions"]

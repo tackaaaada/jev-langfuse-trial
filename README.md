@@ -8,9 +8,9 @@ Jevで回答の意味的一致を一次判定し、その結果を参考情報�
 ```mermaid
 flowchart TD
     A[評価対象の回答と期待回答] --> B[Python: TypeSafe公式SDK]
-    B --> C[Jev: 意味的一致の確率]
-    C --> D[確率と仮の閾値0.5による一次判定]
-    D --> E[Langfuse: finalize-answerに回答・期待回答・Jev結果を記録]
+    B --> C[Jev: 正確性の3つの一次信号]
+    C --> D[Noul確率 / Choice主因 / Score重要度]
+    D --> E[Langfuse: finalize-answerに回答・期待回答・Jev評価を記録]
     E --> F[マネージドEvaluator: GPT-4o]
     F --> G[Check Correctness: 最終true/falseと理由]
 ```
@@ -19,7 +19,7 @@ flowchart TD
 言い換えや形式の違いは許容し、重要な情報の欠落・矛盾・根拠のない主張などは不一致とします。
 
 - **Jev**: TypeSafe公式Python SDK `typesafe-sdk`で直接接続します。Vercel AI Gatewayは使用しません。
-- **一次判定**: Noulが返す意味的一致の確率を保存し、0.5以上をtrueに変換します。0.5は未校正の仮値です。確率は部分正答の点数ではありません。
+- **一次評価**: `is_correct` Noulは正確性trueの確率を返し、0.5以上を仮のtrueに変換します。`primary_correctness_issue` Choiceは正確性上の主因を1つ選び、`correctness_materiality` Scoreは差分の重要度を0〜3で返します。閾値は未校正で、Scoreは最終booleanの部分点ではありません。
 - **最終判定**: GPT-4oが元の回答と期待回答を比較します。Jevの結果は参考情報であり、その判定を変更できます。Jevへの賛否も理由に含めます。
 - **実行対象**: 今回はJevのtrue/falseにかかわらず全件を最終評価に渡します。不確実なケースだけを送る分岐は実装していません。
 
@@ -50,7 +50,6 @@ PythonからGPT-4oを直接呼ぶ構成ではありません。キーをGitやRE
 
 - Langfuse SDK、python-dotenv、TypeSafe SDK（接続確認時: `typesafe-sdk 0.7.0`）
 - Langfuse CLI（接続確認時: `@langfuse/cli 1.2.4`、`~/.local/bin/langfuse`）
-- Langfuseスキル: `.agents/skills/langfuse/`
 
 CLIを別の環境にも導入する場合:
 
@@ -111,9 +110,11 @@ uv run python -m src.semantic_equivalence_benchmark --condition both
 
 [data/semantic_equivalence_v0.json](data/semantic_equivalence_v0.json)の10件を、JevありとJevなしの両方で1回ずつ評価します。各ケースの`expected_match`は人手で付けた比較用の正解ラベルです。LangfuseのEvaluatorに渡す変数には含めず、Observationのmetadataにだけ保存します。
 
-Jevありでは`finalize-answer`を`Check Correctness`が、Jevなしでは`finalize-answer-without-jev`を`Check Correctness Without Jev`が評価します。前者にだけ`jev_result`を渡します。したがって同じ回答・期待回答に対する、Jev情報の有無を比較できます。
+Jevありでは`finalize-answer`を`Check Correctness`が、Jevなしでは`finalize-answer-without-jev`を`Check Correctness Without Jev`が評価します。前者にだけ`jev_correctness_assessment`を渡します。これはNoul・Choice・Scoreをまとめた参考情報です。したがって同じ回答・期待回答に対する、Jev情報の有無を比較できます。
 
 2026-09-19の実行では、3系統（Jev、JevありGPT-4o、JevなしGPT-4o）は10件中9件で人手ラベルと一致し、両GPT-4o条件の最終true/falseは10件すべて同一でした。詳細、全トレース、解釈上の限界は[10件ベンチマークの結果](docs/semantic-equivalence-v0-benchmark.md)を参照してください。
+
+同日、Noul・Choice・Scoreを追加した`correctness-triad-v1`でも同じ10件を比較しました。最終true/falseは前回と同一でしたが、ChoiceとScoreにより、Jevの主因分類と重要度の不確実性を確認できました。[3信号を使った比較結果](docs/correctness-triad-benchmark.md)を参照してください。
 
 ### 接続確認のみ
 
@@ -136,17 +137,19 @@ evaluate-with-jev (SPAN)
 └── finalize-answer (SPAN、Jev完了後に作成)
     ├── output: 元の回答
     ├── metadata.expected_output: 期待回答
-    ├── metadata.jev_result: Jevの確率・判定・閾値・モデル・基準の版
-    └── Scores: Jevの2スコアとGPT-4oの最終スコア
+    ├── metadata.jev_correctness_assessment: JevのNoul・Choice・Score・モデル・基準の版
+    └── Scores: Jevの4スコアとGPT-4oの最終スコア
 ```
 
 | スコア名 | 型 | 意味 |
 | --- | --- | --- |
-| `jev_semantic_match_probability` | NUMERIC | Jevによる意味的一致の確率（0〜1） |
-| `jev_semantic_match` | BOOLEAN | 確率が仮の閾値0.5以上か |
+| `jev_correctness_probability` | NUMERIC | Jev Noulによる正確性trueの確率（0〜1） |
+| `jev_is_correct` | BOOLEAN | Noul確率が仮の閾値0.5以上か |
+| `jev_primary_correctness_issue` | CATEGORICAL | Jev Choiceによる正確性上の主因 |
+| `jev_correctness_materiality` | NUMERIC | Jev Scoreによる差分の重要度（0〜3） |
 | `Check Correctness` | BOOLEAN | GPT-4oによる最終判定。理由も保存 |
 
-Jevの基準は`src/jev_judge.py`の`semantic-equivalence-v1`です。
+Jevの基準は`src/jev_judge.py`の`correctness-triad-v1`です。
 `jev-latest`を指定して呼び出し、返却された具体的なモデル名を記録します。
 初回は`jev-1.13.0`でした。料金設定がない場合、Langfuseのコストは未算出になります。
 
@@ -165,18 +168,18 @@ Jev結果を最終評価対象のmetadataへ直接コピーすることで、後
 | --- | --- | --- |
 | `assistant_output` | output | なし（全体） |
 | `expected_output` | metadata | `$.expected_output` |
-| `jev_result` | metadata | `$.jev_result` |
+| `jev_correctness_assessment` | metadata | `$.jev_correctness_assessment` |
 
 デフォルトの意味的一致プロンプトを維持し、Jevの判定を参考にして最終判定する説明を末尾に追加しています。
 Evaluatorは対象Observationのデータを読みます。通常のObservation評価では、実験データ用の`expected_output`ソースではなく、今回保存したmetadataの期待回答を参照します。
 
-適用済み設定を`config/langfuse/evaluator.json`と`config/langfuse/rule.json`に保存しています。
+公開用の設定テンプレートを`config/langfuse/evaluator.json`と`config/langfuse/rule.json`に保存しています。
 変更前の設定は同ディレクトリの`evaluator-before.json`と`rule-before.json`です。
-このプロジェクトへの再適用は以下です。別プロジェクトではIDと接続名を変更してください。
+Evaluatorを作成した後、ルールJSON内の`YOUR_EVALUATOR_ID`を作成結果のIDに置き換えてください。ID・接続名・ホストは環境ごとに異なります。
 
 ```bash
-langfuse --env .env api evaluators update YOUR_PRIVATE_ID --body-file config/langfuse/evaluator.json
-langfuse --env .env api evaluation-rules update YOUR_PRIVATE_ID --body-file config/langfuse/rule.json
+langfuse --env .env api evaluators update YOUR_EVALUATOR_ID --body-file config/langfuse/evaluator.json
+langfuse --env .env api evaluation-rules update YOUR_RULE_ID --body-file config/langfuse/rule.json
 ```
 
 元に戻す場合は、それぞれの`--body-file`に`evaluator-before.json`と`rule-before.json`を指定します。
@@ -198,10 +201,14 @@ langfuse --env .env api scores list --trace-id TRACE_ID --fields subject,details
 5. Jev結果を参考情報として渡す二段階評価に変更。最終評価用の変数マッピングと対象ルールを設定。
 6. 二段階評価を実行し、Jevの確率0.47・false、GPT-4oの最終falseを読み戻して確認。GPT-4oは「店名との関係が欠けている」と説明し、Jevに同意しました。
 
-ã­ã¼ã«ã«ã®Langfuse UIã§ç¢ºèª
-
 手順4の既存Evaluatorは、期待回答の参照先が実験データ用の設定だったため、期待回答を正しく渡せた比較結果としては扱いません。二段階評価ではmetadataへの明示的なマッピングに修正しています。
 これらは接続・処理の動作確認であり、精度や優劣の結論ではありません。今後、検証データを作成し、誤判定や閾値を確認します。
+
+## 公開前の確認
+
+このリポジトリにはキー、ローカルの`.env`、実行結果の`results/`を含めません。Langfuseへ送る入力・出力・Jev応答はトレースとして保存されるため、本番データでは個人情報・認証情報・機密情報を送信する前に、マスキングと保存期間・アクセス権の運用を決めてください。
+
+検証から得た知見、公開時の注意、未検証の事項は[検証知見と公開時の注意](docs/findings-and-publication.md)にまとめています。
 
 ## 開発時の検証
 

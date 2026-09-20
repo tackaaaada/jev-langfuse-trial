@@ -12,7 +12,7 @@
   ],
   "evaluatorAssignments": [
     {
-      "evaluatorId": "YOUR_PRIVATE_ID",
+      "evaluatorId": "YOUR_EVALUATOR_ID",
       "variableMapping": null
     }
   ]

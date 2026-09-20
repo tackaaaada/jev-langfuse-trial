@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 
-from src.jev_judge import RUBRIC_VERSION, THRESHOLD, evaluate
+from src.jev_judge import RUBRIC_VERSION, THRESHOLD, correctness_assessment, evaluate
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 DATA_PATH = PROJECT_DIR / "data/semantic_equivalence_v0.json"
@@ -94,8 +94,9 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             version=RUBRIC_VERSION,
         ) as generation:
             response = evaluate(state)
-            probability = response.nouls["semantic_match"].noul
-            passed = probability >= THRESHOLD
+            jev_correctness_assessment = correctness_assessment(response)
+            probability = jev_correctness_assessment["is_correct"]["probability"]
+            passed = jev_correctness_assessment["is_correct"]["passed"]
             generation.update(
                 model=response.model,
                 output=response.model_dump(mode="json"),
@@ -104,14 +105,6 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
                     "output": response.usage.output_tokens,
                 },
             )
-        jev_result = {
-            "probability": probability,
-            "passed": passed,
-            "threshold": THRESHOLD,
-            "threshold_calibrated": False,
-            "model": response.model,
-            "rubric_version": RUBRIC_VERSION,
-        }
         with client.start_as_current_observation(
             name="finalize-answer",
             as_type="span",
@@ -120,12 +113,34 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             metadata={
                 **metadata,
                 "expected_output": case["expected_output"],
-                "jev_result": jev_result,
+                "jev_correctness_assessment": jev_correctness_assessment,
             },
         ) as final_review:
-            for name, value, data_type in (
-                ("jev_semantic_match_probability", probability, "NUMERIC"),
-                ("jev_semantic_match", int(passed), "BOOLEAN"),
+            for name, value, data_type, comment in (
+                (
+                    "jev_correctness_probability",
+                    probability,
+                    "NUMERIC",
+                    "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
+                ),
+                (
+                    "jev_is_correct",
+                    int(passed),
+                    "BOOLEAN",
+                    "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
+                ),
+                (
+                    "jev_primary_correctness_issue",
+                    jev_correctness_assessment["primary_correctness_issue"]["choice"],
+                    "CATEGORICAL",
+                    "Jev Choiceによる正確性上の主因。",
+                ),
+                (
+                    "jev_correctness_materiality",
+                    jev_correctness_assessment["correctness_materiality"]["score"],
+                    "NUMERIC",
+                    "Jev Scoreによる正確性上の差分の重要度（0〜3）。",
+                ),
             ):
                 client.create_score(
                     trace_id=root.trace_id,
@@ -133,7 +148,7 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
                     name=name,
                     value=value,
                     data_type=data_type,
-                    comment="Jev Noulによる意味的一致。閾値0.5は未校正の仮値。",
+                    comment=comment,
                     metadata=metadata,
                 )
         return {
@@ -145,6 +160,7 @@ def send_with_jev(client, case: dict, benchmark_id: str) -> dict:
             "trace_url": client.get_trace_url(trace_id=root.trace_id),
             "jev_probability": probability,
             "jev_passed": passed,
+            "jev_correctness_assessment": jev_correctness_assessment,
         }
 
 

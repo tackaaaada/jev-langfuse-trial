@@ -3,12 +3,15 @@
 .env.*
 !.env.example
 !.env.*.example
+.agents/
 .venv/
 __pycache__/
 *.py[cod]
 node_modules/
 results/
 logs/
+docs/long-answer-three-runs.json
+docs/without-jev-three-runs.json
 
 .pytest_cache/
 .ruff_cache/

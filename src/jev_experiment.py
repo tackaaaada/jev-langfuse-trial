@@ -10,7 +10,13 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 
-from src.jev_judge import INSTRUCTIONS, RUBRIC_VERSION, THRESHOLD, evaluate
+from src.jev_judge import (
+    QUESTIONS,
+    RUBRIC_VERSION,
+    THRESHOLD,
+    correctness_assessment,
+    evaluate,
+)
 
 
 def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
@@ -67,18 +73,17 @@ def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
                 input={
                     "state": state,
                     "questions": {
-                        "semantic_match": {
-                            "type": "noul",
-                            "instructions": INSTRUCTIONS,
-                        },
+                        name: question.model_dump(mode="json")
+                        for name, question in QUESTIONS.items()
                     },
                 },
                 metadata=metadata,
                 version=RUBRIC_VERSION,
             ) as generation:
                 response = evaluate(state)
-                probability = response.nouls["semantic_match"].noul
-                passed = probability >= THRESHOLD
+                jev_correctness_assessment = correctness_assessment(response)
+                probability = jev_correctness_assessment["is_correct"]["probability"]
+                passed = jev_correctness_assessment["is_correct"]["passed"]
                 generation.update(
                     model=response.model,
                     output=response.model_dump(mode="json"),
@@ -89,14 +94,6 @@ def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
                 )
             # 完了済みのJev判定を最初から含む専用Observationだけを最終評価する。
             # 後着するScoreや兄弟Observationへの参照には依存しない。
-            jev_result = {
-                "probability": probability,
-                "passed": passed,
-                "threshold": THRESHOLD,
-                "threshold_calibrated": False,
-                "model": response.model,
-                "rubric_version": RUBRIC_VERSION,
-            }
             with langfuse.start_as_current_observation(
                 name="finalize-answer",
                 as_type="span",
@@ -105,12 +102,36 @@ def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
                 metadata={
                     **metadata,
                     "expected_output": state["expected_output"],
-                    "jev_result": jev_result,
+                    "jev_correctness_assessment": jev_correctness_assessment,
                 },
             ) as final_review:
-                for name, value, data_type in (
-                    ("jev_semantic_match_probability", probability, "NUMERIC"),
-                    ("jev_semantic_match", int(passed), "BOOLEAN"),
+                for name, value, data_type, comment in (
+                    (
+                        "jev_correctness_probability",
+                        probability,
+                        "NUMERIC",
+                        "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
+                    ),
+                    (
+                        "jev_is_correct",
+                        int(passed),
+                        "BOOLEAN",
+                        "Jev Noulによる正確性。閾値0.5は未校正の仮値。",
+                    ),
+                    (
+                        "jev_primary_correctness_issue",
+                        jev_correctness_assessment["primary_correctness_issue"][
+                            "choice"
+                        ],
+                        "CATEGORICAL",
+                        "Jev Choiceによる正確性上の主因。",
+                    ),
+                    (
+                        "jev_correctness_materiality",
+                        jev_correctness_assessment["correctness_materiality"]["score"],
+                        "NUMERIC",
+                        "Jev Scoreによる正確性上の差分の重要度（0〜3）。",
+                    ),
                 ):
                     langfuse.create_score(
                         trace_id=trace_id,
@@ -118,7 +139,7 @@ def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
                         name=name,
                         value=value,
                         data_type=data_type,
-                        comment="Jev Noulによる意味的一致。閾値0.5は未校正の仮値。",
+                        comment=comment,
                         metadata=metadata,
                     )
         langfuse.flush()
@@ -135,6 +156,7 @@ def main(*, run_index: int = 1, batch_id: str | None = None) -> dict:
             "observation_id": final_review.id,
             "jev_probability": probability,
             "jev_passed": passed,
+            "jev_correctness_assessment": jev_correctness_assessment,
         }
     finally:
         langfuse.shutdown()
